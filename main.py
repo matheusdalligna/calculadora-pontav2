@@ -5,20 +5,17 @@ import os
 from fpdf import FPDF
 import base64
 
-# 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Gota Perfeita", layout="centered", initial_sidebar_state="collapsed")
+# --- 1. CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="Gota Perfeita - Calibração", layout="centered")
 
-# Estilo CSS para Mobile e Interface
 st.markdown("""
     <style>
-    .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: bold; }
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
-    div[data-testid="stExpander"] { border: 1px solid #ddd; border-radius: 10px; }
-    .instrucao-pressao { font-size: 0.85em; color: #555; margin-bottom: -15px; font-style: italic; }
+    .stButton>button { width: 100%; border-radius: 10px; height: 3em; font-weight: bold; background-color: #2E7D32; color: white; }
+    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; border: 1px solid #ddd; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO TÉCNICA DE GOTAS (Ajustado para "OU") ---
+# --- CONFIGURAÇÃO TÉCNICA DE GOTAS ---
 objetivos = {
     "Herbicida Hormonal": {"gotas": "Extremamente Grossa ou Ultra Grossa", "cor": "#FFFFFF", "txt": "#000000"},
     "Herbicida": {"gotas": "Média, Grossa ou Muito Grossa", "cor": "#FFFF00", "txt": "#000000"},
@@ -33,7 +30,7 @@ class PDF(FPDF):
         if os.path.exists("logo.png"):
             self.image("logo.png", 10, 8, 25)
         self.set_font('helvetica', 'B', 14)
-        self.set_text_color(0, 0, 0)
+        self.set_text_color(46, 125, 50)
         self.cell(0, 10, 'Relatório de Calibração Técnica', 0, 1, 'R')
         self.ln(5)
 
@@ -41,21 +38,16 @@ def gerar_pdf(taxa, vel, esp, vazao, pontas_selecionadas, unidade, objetivo, inf
     pdf = PDF()
     pdf.add_page()
     
-    # Cabeçalho de Parâmetros
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("helvetica", 'B', 11)
     pdf.cell(0, 10, "Parâmetros de Operação", 1, 1, 'L', 1)
     pdf.set_font("helvetica", size=10)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 7, f"Objetivo principal da aplicação: {objetivo}", 0, 1)
+    pdf.cell(0, 7, f"Objetivo: {objetivo}", 0, 1)
     pdf.cell(0, 7, f"Alvo de Gotas: {info_gotas}", 0, 1)
-    pdf.cell(0, 7, f"Taxa de Aplicação: {taxa} L/ha | Velocidade: {vel} km/h", 0, 1)
+    pdf.cell(0, 7, f"Taxa: {taxa} L/ha | Velocidade: {vel} km/h", 0, 1)
     pdf.cell(0, 7, f"Volume/Ponta (Caneca): {vazao:.3f} L/min", 0, 1)
     pdf.ln(5)
-    
-    pdf.set_font("helvetica", 'B', 11)
-    pdf.cell(0, 10, "Sugestões Técnicas de Pontas", 0, 1, 'L')
-    pdf.ln(2)
 
     for i, p in enumerate(pontas_selecionadas):
         pdf.set_fill_color(p['rgb'][0], p['rgb'][1], p['rgb'][2])
@@ -65,33 +57,34 @@ def gerar_pdf(taxa, vel, esp, vazao, pontas_selecionadas, unidade, objetivo, inf
         
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("helvetica", size=10)
-        info = (f"-> Pressão exata para o alvo: {p['pressao']:.2f} {unidade}\n"
-                f"-> Janela de Velocidade permitida: {p['v_min']:.1f} a {p['v_max']:.1f} km/h")
+        info = (f"-> Pressão exata: {p['pressao']:.2f} {unidade}\n"
+                f"-> Janela de Velocidade: {p['v_min']:.1f} a {p['v_max']:.1f} km/h")
         pdf.multi_cell(0, 8, info, 1)
         pdf.ln(3)
-    return pdf.output()
+    
+    # --- CORREÇÃO DO ERRO DE BYTEARRAY ---
+    pdf_output = pdf.output(dest='S')
+    if isinstance(pdf_output, str):
+        # Se vier como string (latin-1), converte para bytes
+        return pdf_output.encode('latin-1')
+    # Se já vier como bytearray ou bytes, garante que seja bytes
+    return bytes(pdf_output)
 
 def exibir_pdf_iframe(pdf_bytes):
     base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" style="background-color: white; border-radius: 10px;"></iframe>'
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" style="border-radius:10px;"></iframe>'
     st.markdown(pdf_display, unsafe_allow_html=True)
 
-# --- 2. LOGO E TITULO ---
+# --- INTERFACE ---
 if os.path.exists("logo.png"):
     st.image(Image.open("logo.png"), width=120)
 
 st.title("Calculadora de Aplicação")
 
-# --- 3. INPUTS ---
-# Objetivo principal da aplicação (Ajuste de texto conforme solicitado)
-obj_selecionado = st.selectbox("🎯 Objetivo principal da aplicação:", list(objetivos.keys()))
+obj_selecionado = st.selectbox("🎯 Objetivo principal:", list(objetivos.keys()))
 info_g = objetivos[obj_selecionado]
 
-st.markdown(f"""
-    <div style="background-color: {info_g['cor']}; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #ccc; margin-bottom: 20px;">
-        <span style="color: {info_g['txt']}; font-weight: bold;">Gota Requerida: {info_g['gotas']}</span>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown(f'<div style="background-color: {info_g["cor"]}; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #ccc; margin-bottom: 20px;"><span style="color: {info_g["txt"]}; font-weight: bold;">Gota Requerida: {info_g["gotas"]}</span></div>', unsafe_allow_html=True)
 
 with st.expander("⚙️ Ajustar Parâmetros", expanded=True):
     v_kmh = st.number_input("Velocidade (km/h)", min_value=0.1, value=8.0, step=0.5)
@@ -99,13 +92,11 @@ with st.expander("⚙️ Ajustar Parâmetros", expanded=True):
     esp_cm = st.number_input("Espaçamento (cm)", min_value=1.0, value=50.0, step=5.0)
     unidade_p = st.selectbox("Unidade de Pressão:", ["psi", "bar", "kPa"])
     
-    st.markdown('<p class="instrucao-pressao">Informe a pressão inicial e final de trabalho do modelo da ponta escolhida:</p>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     defaults = {"psi": (30.0, 60.0), "bar": (2.0, 4.0), "kPa": (200.0, 400.0)}
     p_min_input = c1.number_input(f"P. Mínima", value=defaults[unidade_p][0])
     p_max_input = c2.number_input(f"P. Máxima", value=defaults[unidade_p][1])
 
-# --- 4. CÁLCULO ---
 vazao_alvo = (taxa_lha * v_kmh * esp_cm) / 60000
 st.metric(label="Volume Coletado (Caneca)", value=f"{vazao_alvo:.3f} L/min")
 
@@ -135,25 +126,21 @@ for nome, dados in tabela_iso.items():
             "rgb": dados['rgb'], "txt_rgb": dados['txt_rgb'], "cor_bg": dados['cor_bg'], "cor_txt": dados['cor_txt']
         })
 
-# --- 5. RESULTADOS ---
 if pontas_possiveis:
     st.subheader("Seleção de Pontas")
-    escolhidas = st.multiselect("Defina a ordem do relatório:", [p['nome'] for p in pontas_possiveis], default=[p['nome'] for p in pontas_possiveis])
+    escolhidas = st.multiselect("Ordem no relatório:", [p['nome'] for p in pontas_possiveis], default=[p['nome'] for p in pontas_possiveis])
     pontas_finais = [p for name in escolhidas for p in pontas_possiveis if p['nome'] == name]
 
     if pontas_finais:
         for i, p in enumerate(pontas_finais):
-            st.markdown(f"""
-                <div style="background-color: {p['cor_bg']}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 8px; border: 1px solid #444;">
-                    <b style="color: {p['cor_txt']};">{i+1}ª: {p['nome']}</b><br>
-                    <span style="color: {p['cor_txt']};">{p['pressao']:.2f} {unidade_p} | {p['v_min']:.1f}-{p['v_max']:.1f} km/h</span>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color: {p["cor_bg"]}; padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 8px; border: 1px solid #444;"><b style="color: {p["cor_txt"]};">{i+1}ª: {p["nome"]}</b><br><span style="color: {p["cor_txt"]};">{p["pressao"]:.2f} {unidade_p} | {p["v_min"]:.1f}-{p['v_max']:.1f} km/h</span></div>', unsafe_allow_html=True)
         
         pdf_raw = gerar_pdf(taxa_lha, v_kmh, esp_cm, vazao_alvo, pontas_finais, unidade_p, obj_selecionado, info_g['gotas'])
+        
         st.divider()
-        st.download_button("📥 Baixar Relatório Técnico", data=bytes(pdf_raw), file_name="relatorio_calibracao.pdf", mime="application/pdf")
-        with st.expander("👁️ Prévia do Relatório"):
+        st.download_button(label="📥 Baixar Relatório (PDF)", data=pdf_raw, file_name="relatorio_calibracao.pdf", mime="application/pdf")
+        
+        with st.expander("👁️ Prévia"):
             exibir_pdf_iframe(pdf_raw)
 else:
-    st.warning("Nenhuma ponta atende aos critérios de vazão e pressão.")
+    st.warning("Nenhuma ponta compatível encontrada.")
