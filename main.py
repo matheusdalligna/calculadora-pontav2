@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as ststrea
 import math
 from PIL import Image
 import os
